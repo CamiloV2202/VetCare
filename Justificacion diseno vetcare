@@ -1,0 +1,90 @@
+# Justificación de decisiones de diseño - VetCare
+
+Para construir VetCare tomé varias decisiones de diseño pensando en mantener el código
+ordenado, que cumpliera con los pilares de POO y que fuera fácil de mantener. A continuación
+explico las más importantes.
+
+## Arquitectura en paquetes
+
+Decidí separar el proyecto en tres paquetes para no mezclar responsabilidades:
+
+- **Model**: contiene las clases del dominio (Persona, Cliente, Mascota, Cita) y los enums
+  (Sexo, EstadoCita). Aquí solo viven los datos y su comportamiento básico.
+- **Data**: contiene la clase `Veterinaria`, que es el cerebro del sistema (maneja las listas
+  y la lógica), y `PersistenciaArchivo`, que se encarga de leer y escribir los archivos.
+- **Gui**: contiene todas las pantallas hechas con Swing (la ventana principal y un panel por
+  cada función).
+
+Hice esta separación porque si la lógica, los datos y la interfaz estuvieran todos en la misma
+clase sería un desorden y muy difícil de modificar. Así, si quiero cambiar cómo se ve una
+ventana, no tengo que tocar la lógica de negocio.
+
+## Herencia y encapsulamiento
+
+Creé una clase abstracta `Persona` con los atributos comunes (documento, nombre, teléfono) y
+de ahí hice que `Cliente` heredara con sus atributos propios (email, dirección). La hice
+abstracta porque no tiene sentido crear una "Persona" suelta; siempre va a ser un Cliente (y
+si en el futuro agrego un Veterinario o Recepcionista, también podrían heredar de Persona).
+
+Todos los atributos de las clases son privados y se acceden por medio de getters y setters.
+Esto es encapsulamiento: protejo los datos para que no se modifiquen desde cualquier lado sin
+control.
+
+Decidí que Mascota y Cita NO heredaran de Persona porque no son personas. En cambio las
+relacioné por composición/asociación: una Mascota tiene un Cliente como dueño, y una Cita
+tiene una Mascota.
+
+## Estructuras de datos
+
+Para guardar los registros en memoria usé `ArrayList` (Listas de Java). La clase `Veterinaria`
+tiene tres listas: una de clientes, una de mascotas y una de citas. Elegí ArrayList porque
+necesitaba recorrer los datos fácilmente y agregar/eliminar elementos sin un tamaño fijo.
+
+## Enums para los estados
+
+Usé enums en dos lugares: `Sexo` (MACHO, HEMBRA) y `EstadoCita` (EN_ESPERA, EN_PROCESO,
+ATENDIDA, CANCELADA). Los usé porque son valores cerrados y fijos: una cita solo puede estar
+en uno de esos cuatro estados. Si usara texto suelto podría haber errores de escritura
+("atendida", "Atendida", "atendido"), mientras que con un enum eso no puede pasar.
+
+El estado de la cita es la pieza central de la lógica: si está EN_ESPERA o EN_PROCESO la cita
+sigue en la pestaña de Citas; cuando pasa a ATENDIDA o CANCELADA se va automáticamente al
+Historial.
+
+## Persistencia en archivos CSV
+
+Para no perder la información al cerrar el programa, guardo todo en tres archivos: clientes.csv,
+mascotas.csv y citas.csv. Elegí CSV porque es un formato sencillo de leer y escribir línea por
+línea, usando un punto y coma (;) como separador. Cada vez que registro, modifico o elimino
+algo, vuelvo a guardar el archivo correspondiente. Al abrir el programa, cargo todo de nuevo y
+reconstruyo las relaciones (por ejemplo, busco el dueño de cada mascota por su documento).
+
+Cuando agregué campos nuevos a las citas (como la prioridad o el estado), los puse al final de
+cada línea del CSV a propósito, para que los archivos viejos que no tenían esas columnas
+siguieran cargando sin romperse, poniéndoles un valor por defecto.
+
+## Manejo de errores
+
+Usé bloques try-catch en los lugares donde el usuario podría meter datos incorrectos. El caso
+más claro es la edad de la mascota: si alguien escribe una letra en vez de un número, el
+`Integer.parseInt` lanzaría una excepción y el programa se cerraría; con el try-catch lo atrapo
+y le muestro un mensaje claro en vez de que se caiga. También validé con expresiones regulares
+que el documento sean solo números, el nombre solo letras, etc.
+
+## Otras decisiones de lógica
+
+Agregué algunas reglas de negocio que me parecieron lógicas para una clínica real:
+
+- No se puede eliminar un cliente que todavía tenga mascotas, ni una mascota que tenga citas
+  (para no dejar datos "huérfanos" apuntando a algo que ya no existe).
+- No se pueden agendar dos citas a la misma fecha y hora, porque la veterinaria no puede
+  atender dos a la vez.
+- No se puede agendar una cita en una fecha u hora que ya pasó.
+- Cuando se atiende una cita, comparo la hora real con la prevista para registrar si fue
+  atendida a tiempo, antes o después.
+
+## Limitaciones que reconozco
+
+El sistema asume que los datos en los campos no contienen el carácter separador (;). También
+modelé un solo "espacio de atención" (no hay varios veterinarios en paralelo). Son cosas que
+mejoraría en una versión futura, pero para el alcance del proyecto cumplen su función.
